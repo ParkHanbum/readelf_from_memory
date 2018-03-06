@@ -11,13 +11,33 @@ unsigned int gStrsz = 0;
 long gSymtab = 0;
 long gStrtab = 0;
 
+#define MAX_STRTAB_SIZE 1024
+#define NEW_STRING_START 0
+#define STRING_END 1 
 
-void print_str_tab(long vaddr)
+void print_str_tab(long vaddr, unsigned int size)
 {
+	long strtab[MAX_STRTAB_SIZE];
 	printf("Strtab address : %lx\n", vaddr);
 	const char* pStr = (const char*)vaddr;
 	// start address is 0.
 	printf("%s\n", pStr+1);
+	
+	int flag = NEW_STRING_START;
+	for (int i = 0;i < size;i++) {
+		unsigned int value = (unsigned int)*(pStr+i);
+		// terminator 
+		if (value == 0) {		
+			flag = STRING_END;
+		} else {
+			if (flag) {
+				strtab[i] = (long)pStr+i;
+				printf("%lx\n", strtab[i]);
+			}
+		}
+	}
+	
+	
 }
 
 const char* symbol_type_toString(unsigned char st_info) 
@@ -298,6 +318,7 @@ void get_proc_map(pid_t pid)
 	assert(gStrtab);
 	assert(gSymtab);
 	printf("%d, %d, %d\n", gStrsz, gStrtab, gSymtab);
+	print_str_tab(gStrtab, gStrsz);
 }
 
 
