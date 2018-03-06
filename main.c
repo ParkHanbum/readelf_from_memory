@@ -7,7 +7,7 @@
 
 int main() {
 	get_proc_map(getpid());	
-	get_phdrs();
+	//get_phdrs();
 	getchar();
 	return 0;
 }

@@ -5,16 +5,33 @@
 #include <fcntl.h>
 #include <elf.h>
 #include <string.h>
+#include <assert.h>
+
+unsigned int gStrsz = 0;
+long gSymtab = 0;
+long gStrtab = 0;
 
 
 void print_str_tab(long vaddr)
 {
 	printf("Strtab address : %lx\n", vaddr);
 	const char* pStr = (const char*)vaddr;
-	for(int i=0;i < 4;i++) {
-		printf("%s\n", pStr+i);
+	// start address is 0.
+	printf("%s\n", pStr+1);
+}
+
+const char* symbol_type_toString(unsigned char st_info) 
+{
+	switch(ELF64_ST_TYPE(st_info)) {
+		case STT_NOTYPE:
+			return "NOTYPE";
+		case STT_OBJECT:
+			return "OBJECT";
+		case STT_FUNC:
+			return "FUNC";
+		default:
+			return "NONEED";
 	}
-	
 }
 
 void print_sym_tab(long vaddr) 
@@ -22,9 +39,11 @@ void print_sym_tab(long vaddr)
 	printf("Symtab address : %lx\n", vaddr);
 	Elf64_Sym *pSymtab = (Elf64_Sym *) vaddr;
 	
-	for(int i=0;i < 4;i++) { 
-		printf("%p Symbol : %x, %x, %x, %x, %x, %x \n", pSymtab, pSymtab[i].st_name, 
-		pSymtab[i].st_info, pSymtab[i].st_other, pSymtab[i].st_shndx, 
+	for(int i=0;i < 20;i++) { 
+		printf("Symbol : [ADDR: %p] %x, %s, %x, %x, %x, %x \n", pSymtab + sizeof(Elf64_Sym) * i, 
+		pSymtab[i].st_name, 
+		symbol_type_toString(pSymtab[i].st_info),
+		pSymtab[i].st_other, pSymtab[i].st_shndx, 
 		pSymtab[i].st_value, pSymtab[i].st_size);
 
 	}
@@ -219,6 +238,7 @@ void get_proc_map(pid_t pid)
 				long relative_phoff = start_addr + phoff;
 				printf("Program Header offset : %x\n", relative_phoff);
 				
+				long symtab_vaddr, strtab_vaddr, symtab_entsize, strtab_size;
 				for (int phidx=0; phidx < pEhdr->e_phnum; phidx++) {
 					Elf64_Phdr* pPhdr = (Elf64_Phdr *) (relative_phoff + sizeof(Elf64_Phdr) * phidx);	
 					//printf("Virtual Address : %x, type : %x\n", pPhdr->p_vaddr, pPhdr->p_type);
@@ -236,9 +256,13 @@ void get_proc_map(pid_t pid)
 								//printf("\tDtag : %d, val : %x\n", dyn_seg_rva[i].d_tag, dyn_seg_rva[i].d_un.d_val);
 								if (d_tag == DT_SYMTAB) { 
 									// symtab
-									print_sym_tab(d_val);
+									gSymtab = d_val;
+									//print_sym_tab(d_val);
 								} else if (d_tag == DT_STRTAB) {
-									print_str_tab(d_val);
+									gStrtab = d_val;
+									//print_str_tab(d_val);
+								} else if (d_tag == DT_STRSZ) {
+									gStrsz = d_val;
 								}
 							}
 						}	
@@ -255,9 +279,9 @@ void get_proc_map(pid_t pid)
 								//printf("\tDtag : %d, val : %x\n", dyn_seg_rva[i].d_tag, dyn_seg_rva[i].d_un.d_val);
 								if (d_tag == DT_SYMTAB) { 
 									// symtab
-									print_sym_tab(d_val);
+									//print_sym_tab(d_val);
 								} else if (d_tag == DT_STRTAB) {
-									print_str_tab(d_val);	
+									//print_str_tab(d_val);	
 								}
 
 							}
@@ -269,6 +293,11 @@ void get_proc_map(pid_t pid)
 		}
         }
         fclose(fp);
+
+	assert(gStrsz);
+	assert(gStrtab);
+	assert(gSymtab);
+	printf("%d, %d, %d\n", gStrsz, gStrtab, gSymtab);
 }
 
 
