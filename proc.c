@@ -7,18 +7,45 @@
 #include <string.h>
 #include <assert.h>
 
-unsigned int gStrsz = 0;
+long gStrsz = 0;
 long gSymtab = 0;
 long gStrtab = 0;
+long soname_offset = 0;
 
+#define MAX_STRTAB_SIZE 1024
+#define NEW_STRING_START 0
+#define STRING_END 1 
 
-void print_str_tab(long vaddr)
+void print_str_tab(long vaddr, unsigned int size)
 {
+	long strtab[MAX_STRTAB_SIZE];
 	printf("Strtab address : %lx\n", vaddr);
 	const char* pStr = (const char*)vaddr;
 	// start address is 0.
 	printf("%s\n", pStr+1);
+
+	int flag = NEW_STRING_START;
+	for (int i = 0;i < size;i++) {
+		unsigned int value = (unsigned int)*(pStr+i);
+		// terminator
+		if (value == 0) {
+			flag = STRING_END;
+		} else {
+			if (flag) {
+				strtab[i] = (long)pStr+i;
+				printf("%lx\n", strtab[i]);
+			}
+		}
+	}
 }
+
+void print_soname(long vaddr, long offset)
+{
+	const char *pStr = (const char *)(vaddr+offset);
+
+	printf("soname : %s\n", pStr);
+}
+
 
 const char* symbol_type_toString(unsigned char st_info) 
 {
@@ -129,6 +156,7 @@ void print_dyn_el(long dtag, long value)
 			break;
 		case 14:
 			tag_name = "DT_SONAME";
+			soname_offset = value;
 			break;
 		case 15:
 			tag_name = "DT_RPATH";
@@ -277,27 +305,41 @@ void get_proc_map(pid_t pid)
 								Elf64_Xword d_val = dyn_seg_rva[i].d_un.d_val;
 								print_dyn_el(d_tag, d_val);
 								//printf("\tDtag : %d, val : %x\n", dyn_seg_rva[i].d_tag, dyn_seg_rva[i].d_un.d_val);
-								if (d_tag == DT_SYMTAB) { 
+								if (d_tag == DT_SYMTAB) {
 									// symtab
+									gSymtab = d_val;
 									//print_sym_tab(d_val);
 								} else if (d_tag == DT_STRTAB) {
-									//print_str_tab(d_val);	
+									gStrtab = d_val;
+									//print_str_tab(d_val);
+								} else if (d_tag == DT_STRSZ) {
+									gStrsz = d_val;
 								}
-
 							}
 						}
 					}
-					
 				}
 			}
 		}
-        }
+
+		printf("%lx, %lx, %lx\n", gStrsz, gStrtab, gSymtab);
+
+		if (!gStrsz)
+			continue;
+		print_soname(gStrtab, soname_offset);
+		// print_str_tab(gStrtab, gStrsz);
+
+        } // while end
         fclose(fp);
 
-	assert(gStrsz);
+	printf("%ld, %ld, %ld\n", gStrsz, gStrtab, gSymtab);
+
+	if (!gStrsz)
+		return;
+
 	assert(gStrtab);
 	assert(gSymtab);
-	printf("%d, %d, %d\n", gStrsz, gStrtab, gSymtab);
+	// print_str_tab(gStrtab, gStrsz);
 }
 
 
